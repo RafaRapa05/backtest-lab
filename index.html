@@ -123,6 +123,17 @@
 
   .field{ margin-bottom:12px; }
   .field label{ display:block; font-size:12px; color:var(--text-secondary); margin-bottom:5px; }
+  .subhead{
+    font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-muted); margin:16px 0 10px; padding-top:12px; border-top:1px solid var(--border);
+  }
+  .hint{ font-size:11px; color:var(--text-muted); line-height:1.5; margin:-2px 0 14px; }
+  .costline{
+    display:flex; flex-wrap:wrap; gap:14px; font-size:11.5px; color:var(--text-secondary);
+    margin:0 0 16px; padding:9px 13px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; box-shadow:var(--shadow);
+  }
+  .costline b{ font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--text-primary); }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   input[type="text"], input[type="number"], select{
     width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-strong);
@@ -318,14 +329,35 @@
           <div class="field"><label for="spreadCost">Spread ($/oz)</label><input type="number" id="spreadCost" value="0.30" min="0" step="0.05"></div>
         </div>
 
+        <div class="subhead">Spesifikasi Broker</div>
+        <div class="row2">
+          <div class="field"><label for="commission">Komisen ($/lot/sisi)</label><input type="number" id="commission" value="0" min="0" step="0.5"></div>
+          <div class="field"><label for="leverage">Leverage 1:</label><input type="number" id="leverage" value="100" min="1" step="1"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="swapLong">Swap Long ($/lot/malam)</label><input type="number" id="swapLong" value="0" step="0.1"></div>
+          <div class="field"><label for="swapShort">Swap Short ($/lot/malam)</label><input type="number" id="swapShort" value="0" step="0.1"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="stopOut">Stop Out (%)</label><input type="number" id="stopOut" value="50" min="0" step="5"></div>
+          <div class="field"><label for="execution">Eksekusi</label>
+            <select id="execution">
+              <option value="nextopen" selected>Open bar berikut</option>
+              <option value="close">Close bar sinyal</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint">Nilai swap &amp; komisen ada di MT5: klik kanan simbol di Market Watch &rarr; Specification. Swap negatif bermakna caj.</p>
+
         <button class="primary" id="runBtn" type="button">Jalankan Backtest</button>
-        <p class="note">Simulasi disederhanakan: eksekusi di harga close bar, SL/TP dicek dari high/low bar yang sama, tanpa jalur intrabar. Untuk validasi akhir tetap cross-check di MT5 Strategy Tester.</p>
+        <p class="note">Mengikut model MT5 mod <em>1 Minute OHLC</em>: masuk di open bar berikut, harga Bid/Ask, jalur dalam bar O&rarr;L&rarr;H&rarr;C (bar naik) atau O&rarr;H&rarr;L&rarr;C (bar turun), swap harian dengan rollover Rabu 3&times;, komisen, serta margin dan stop out. Belum ada: tick sebenar, requote, slippage, dan had jarak SL/TP broker. Sahkan keputusan akhir di MT5 Strategy Tester.</p>
       </div>
     </aside>
 
     <section>
       <p class="warnbar" id="blownWarning" hidden></p>
       <div class="kpis" id="kpis"></div>
+      <div class="costline" id="costline"></div>
 
       <div class="panel">
         <div class="section-title">
@@ -337,8 +369,9 @@
           <div class="tooltip" id="tooltip"><div class="t1"></div><div class="t2"></div></div>
         </div>
         <div class="legend">
-          <div class="item"><span class="sw"></span> Ekuitas kumulatif</div>
+          <div class="item"><span class="sw"></span> Ekuiti akaun</div>
           <div class="item"><span class="sw dd"></span> Drawdown dari puncak</div>
+          <div class="item"><span class="sw" style="background:var(--baseline);height:2px;"></span> Modal awal</div>
         </div>
       </div>
 
@@ -537,79 +570,128 @@
     return desired;
   }
 
+  // Mengikut model MT5 mod "1 Minute OHLC": isyarat pada bar tertutup
+  // dilaksanakan pada open bar berikut, harga Bid/Ask dipisahkan oleh spread,
+  // dan jalur dalam bar menentukan sama ada SL atau TP kena dahulu.
   function runBacktest(bars, desired, tr){
-    var n = bars.length, position=0, entryPrice=0, entryIndex=0, realized=0, peak=0, maxDD=0, maxDDPct=0;
-    var equity = new Array(n).fill(0), trades = [];
-    var cost = (tr.spread||0) * tr.contractSize * tr.lots;
-    var blownAt = null;
-    for(var i=0;i<n;i++){
-      var t=bars[i][0], h=bars[i][2], l=bars[i][3], c=bars[i][4];
-      if(position!==0){
-        var hitPrice=null, reason=null;
-        if(position===1){
-          if(tr.sl>0 && l<=entryPrice-tr.sl){ hitPrice=entryPrice-tr.sl; reason='sl'; }
-          else if(tr.tp>0 && h>=entryPrice+tr.tp){ hitPrice=entryPrice+tr.tp; reason='tp'; }
-        } else {
-          if(tr.sl>0 && h>=entryPrice+tr.sl){ hitPrice=entryPrice+tr.sl; reason='sl'; }
-          else if(tr.tp>0 && l<=entryPrice-tr.tp){ hitPrice=entryPrice-tr.tp; reason='tp'; }
-        }
-        if(hitPrice!=null){
-          var pl0 = (hitPrice-entryPrice)*position*tr.contractSize*tr.lots - cost;
-          realized += pl0;
-          trades.push({dir:position, entryTime:bars[entryIndex][0], entryPrice:entryPrice, exitTime:t, exitPrice:hitPrice, pl:pl0, reason:reason});
-          position=0;
-        }
-      }
-      var want = desired[i];
-      if(want!==position){
-        if(position!==0){
-          var pl1 = (c-entryPrice)*position*tr.contractSize*tr.lots - cost;
-          realized += pl1;
-          trades.push({dir:position, entryTime:bars[entryIndex][0], entryPrice:entryPrice, exitTime:t, exitPrice:c, pl:pl1, reason:'signal'});
-          position=0;
-        }
-        if(want!==0){ position=want; entryPrice=c; entryIndex=i; }
-      }
-      var unreal = position!==0 ? (c-entryPrice)*position*tr.contractSize*tr.lots : 0;
-      var eq = realized+unreal;
-      equity[i]=eq;
-      if(eq>peak) peak=eq;
-      var dd = peak-eq; if(dd>maxDD) maxDD=dd;
-      var base = tr.balance+peak;
-      var ddPct = base>0 ? dd/base*100 : 0; if(ddPct>maxDDPct) maxDDPct=ddPct;
+    var n = bars.length;
+    var lots = tr.lots, cs = tr.contractSize, spread = tr.spread;
+    var perPoint = lots * cs;
+    var commRound = tr.commission * lots * 2;
+    var balance = tr.balance;
+    var position = 0, entryPrice = 0, entryTime = 0, swapAccrued = 0;
+    var equity = new Array(n).fill(tr.balance), trades = [];
+    var peak = tr.balance, maxDD = 0, maxDDPct = 0;
+    var totalCommission = 0, totalSwap = 0, totalSpread = 0;
+    var blownAt = null, stopOuts = 0, skippedMargin = 0, pending = 0;
 
-      // Modal habis: broker akan stop-out, jadi simulasi berhenti di sini
-      // daripada meneruskan trading dengan saldo negatif.
-      if(tr.balance>0 && tr.balance+eq <= 0){
-        if(position!==0){
-          realized += unreal;
-          trades.push({dir:position, entryTime:bars[entryIndex][0], entryPrice:entryPrice, exitTime:t, exitPrice:c, pl:unreal, reason:'stopout'});
-          position=0;
+    function marginNeeded(price){ return tr.leverage > 0 ? (lots * cs * price) / tr.leverage : 0; }
+    function exitPriceAt(bid){ return position === 1 ? bid : bid + spread; }
+
+    function closeAt(price, time, reason){
+      var gross = (price - entryPrice) * position * perPoint;
+      var pl = gross - commRound - swapAccrued;
+      balance += pl;
+      totalCommission += commRound;
+      totalSwap += swapAccrued;
+      totalSpread += spread * perPoint;
+      trades.push({dir:position, entryTime:entryTime, entryPrice:entryPrice,
+        exitTime:time, exitPrice:price, pl:pl, reason:reason});
+      position = 0; swapAccrued = 0;
+    }
+    function openAt(dir, bid, time){
+      var price = dir === 1 ? bid + spread : bid;
+      if(marginNeeded(price) > balance){ skippedMargin++; return; }
+      position = dir; entryPrice = price; entryTime = time; swapAccrued = 0;
+    }
+    function floatingAt(bid){
+      return position === 0 ? 0
+        : (exitPriceAt(bid) - entryPrice) * position * perPoint - commRound - swapAccrued;
+    }
+
+    for(var i=0;i<n;i++){
+      var t=bars[i][0], o=bars[i][1], h=bars[i][2], l=bars[i][3], c=bars[i][4];
+
+      if(tr.execution === 'nextopen' && pending !== position){
+        if(position !== 0) closeAt(exitPriceAt(o), t, 'signal');
+        if(pending !== 0) openAt(pending, o, t);
+      }
+
+      if(position !== 0 && i > 0){
+        var prev = new Date(bars[i-1][0]), now = new Date(t);
+        if(prev.getUTCDate() !== now.getUTCDate() || prev.getUTCMonth() !== now.getUTCMonth()
+           || prev.getUTCFullYear() !== now.getUTCFullYear()){
+          var nights = now.getUTCDay() === 4 ? 3 : 1;
+          swapAccrued -= (position === 1 ? tr.swapLong : tr.swapShort) * lots * nights;
         }
-        blownAt = t;
-        for(var k=i+1;k<n;k++) equity[k]=realized;
+      }
+
+      if(position !== 0){
+        var order = (c >= o) ? ['low','high'] : ['high','low'];
+        for(var s=0; s<2 && position!==0; s++){
+          var isLow = order[s] === 'low';
+          var bidExtreme = isLow ? l : h;
+          if(position === 1){
+            if(isLow && tr.sl>0 && bidExtreme <= entryPrice - tr.sl) closeAt(entryPrice - tr.sl, t, 'sl');
+            else if(!isLow && tr.tp>0 && bidExtreme >= entryPrice + tr.tp) closeAt(entryPrice + tr.tp, t, 'tp');
+          } else {
+            var askExtreme = bidExtreme + spread;
+            if(!isLow && tr.sl>0 && askExtreme >= entryPrice + tr.sl) closeAt(entryPrice + tr.sl, t, 'sl');
+            else if(isLow && tr.tp>0 && askExtreme <= entryPrice - tr.tp) closeAt(entryPrice - tr.tp, t, 'tp');
+          }
+        }
+      }
+
+      if(position !== 0 && tr.stopOut > 0){
+        var adverseBid = position === 1 ? l : h;
+        var used = marginNeeded(entryPrice);
+        if(used > 0 && (balance + floatingAt(adverseBid)) / used * 100 < tr.stopOut){
+          closeAt(exitPriceAt(adverseBid), t, 'stopout');
+          stopOuts++;
+        }
+      }
+
+      var eq = balance + floatingAt(c);
+      equity[i] = eq;
+      if(eq > peak) peak = eq;
+      var dd = peak - eq; if(dd > maxDD) maxDD = dd;
+      var ddPct = peak > 0 ? dd/peak*100 : 0; if(ddPct > maxDDPct) maxDDPct = ddPct;
+
+      if(balance <= 0){
+        if(position !== 0) closeAt(exitPriceAt(c), t, 'stopout');
+        blownAt = t; equity[i] = balance;
+        for(var k=i+1;k<n;k++) equity[k] = balance;
         break;
       }
+
+      pending = desired[i];
+      if(tr.execution === 'close' && pending !== position){
+        if(position !== 0) closeAt(exitPriceAt(c), t, 'signal');
+        if(pending !== 0) openAt(pending, c, t);
+      }
     }
-    if(position!==0 && !blownAt){
-      var last=bars[n-1], exitPrice=last[4];
-      var pl2 = (exitPrice-entryPrice)*position*tr.contractSize*tr.lots - cost;
-      realized += pl2;
-      trades.push({dir:position, entryTime:bars[entryIndex][0], entryPrice:entryPrice, exitTime:last[0], exitPrice:exitPrice, pl:pl2, reason:'end'});
-      equity[n-1]=realized;
+
+    if(position !== 0 && !blownAt){
+      var last = bars[n-1];
+      closeAt(exitPriceAt(last[4]), last[0], 'end');
+      equity[n-1] = balance;
     }
+
     var wins = trades.filter(function(x){return x.pl>0;}), losses = trades.filter(function(x){return x.pl<=0;});
     var grossProfit = wins.reduce(function(s,x){return s+x.pl;},0);
     var grossLoss = Math.abs(losses.reduce(function(s,x){return s+x.pl;},0));
+    var netPl = balance - tr.balance;
     return { equity:equity, trades:trades, stats:{
-      netPl:realized,
-      netPlPct: tr.balance>0? realized/tr.balance*100:0,
+      netPl: netPl,
+      netPlPct: tr.balance>0 ? netPl/tr.balance*100 : 0,
       winRate: trades.length ? wins.length/trades.length*100 : 0,
       profitFactor: grossLoss>0 ? grossProfit/grossLoss : (grossProfit>0?Infinity:0),
       totalTrades: trades.length,
       maxDD: maxDD, maxDDPct: maxDDPct,
-      expectancy: trades.length ? realized/trades.length : 0,
-      blownAt: blownAt
+      expectancy: trades.length ? netPl/trades.length : 0,
+      totalCommission: totalCommission, totalSwap: totalSwap, totalSpread: totalSpread,
+      stopOuts: stopOuts, skippedMargin: skippedMargin,
+      finalBalance: balance, blownAt: blownAt
     }};
   }
 
@@ -654,15 +736,25 @@
     return bars;
   }
 
+  // Hujung minggu dilangkau dan setiap open dibuka dengan jurang daripada close
+  // sebelumnya — tanpa jurang, mod eksekusi "open bar berikut" dan "close bar
+  // isyarat" akan memberi hasil yang sama dan menyembunyikan perbezaan sebenar.
   function generateSampleBars(){
     var seed=42;
     function rand(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
-    var bars=[], price=2020, start=Date.UTC(2026,0,2), dayMs=86400000;
-    for(var i=0;i<170;i++){
-      var drift=(rand()-0.48)*10, open=price, close=open+drift;
-      var high=Math.max(open,close)+rand()*4, low=Math.min(open,close)-rand()*4;
-      price=close;
-      bars.push([start+i*dayMs, +open.toFixed(2), +high.toFixed(2), +low.toFixed(2), +close.toFixed(2), Math.round(1000+rand()*500)]);
+    var bars=[], price=2020, dayMs=86400000, d=new Date(Date.UTC(2026,0,2));
+    while(bars.length < 170){
+      var dow = d.getUTCDay();
+      if(dow !== 0 && dow !== 6){
+        var gap = (rand()-0.5) * (dow === 1 ? 7 : 2);
+        var open = price + gap;
+        var close = open + (rand()-0.48)*10;
+        var high = Math.max(open,close) + rand()*4;
+        var low = Math.min(open,close) - rand()*4;
+        price = close;
+        bars.push([d.getTime(), +open.toFixed(2), +high.toFixed(2), +low.toFixed(2), +close.toFixed(2), Math.round(1000+rand()*500)]);
+      }
+      d = new Date(d.getTime() + dayMs);
     }
     return bars;
   }
@@ -677,7 +769,13 @@
       lots: parseFloat($('lots').value)||0.01,
       contractSize: parseFloat($('contractSize').value)||100,
       balance: parseFloat($('balance').value)||0,
-      spread: parseFloat($('spreadCost').value)||0
+      spread: parseFloat($('spreadCost').value)||0,
+      commission: parseFloat($('commission').value)||0,
+      swapLong: parseFloat($('swapLong').value)||0,
+      swapShort: parseFloat($('swapShort').value)||0,
+      leverage: parseFloat($('leverage').value)||0,
+      stopOut: parseFloat($('stopOut').value)||0,
+      execution: $('execution').value
     };
     if(s==='ma'){ base.maType=$('maType').value; base.fast=parseInt($('maFast').value,10)||10; base.slow=parseInt($('maSlow').value,10)||30; }
     else if(s==='rsi'){ base.period=parseInt($('rsiPeriod').value,10)||14; base.oversold=parseFloat($('rsiOversold').value)||30; base.overbought=parseFloat($('rsiOverbought').value)||70; }
@@ -695,10 +793,24 @@
     var warn = $('blownWarning');
     if(st.blownAt){
       warn.hidden = false;
-      warn.textContent = 'Modal habis (stop out) pada ' + fmtDate(st.blownAt, true) + '. Simulasi berhenti di titik itu — sisa data tidak diperdagangkan.';
+      warn.textContent = 'Modal habis pada ' + fmtDate(st.blownAt, true) + '. Simulasi berhenti di titik itu — sisa data tidak diperdagangkan.';
+    } else if(st.skippedMargin && !st.totalTrades){
+      warn.hidden = false;
+      warn.textContent = 'Tiada transaksi dibuka: margin tidak mencukupi untuk ' + st.skippedMargin
+        + ' isyarat. Kecilkan saiz lot atau naikkan leverage/modal.';
     } else {
       warn.hidden = true;
     }
+
+    var bits = [
+      'Baki akhir <b>' + fmtMoney(st.finalBalance) + '</b>',
+      'Spread <b>' + fmtMoney(st.totalSpread) + '</b>',
+      'Komisen <b>' + fmtMoney(st.totalCommission) + '</b>',
+      'Swap <b>' + fmtMoney(st.totalSwap) + '</b>'
+    ];
+    if(st.stopOuts) bits.push('Stop out <b>' + st.stopOuts + '×</b>');
+    if(st.skippedMargin) bits.push('Ditolak margin <b>' + st.skippedMargin + '×</b>');
+    $('costline').innerHTML = bits.map(function(b){ return '<span>'+b+'</span>'; }).join('');
     $('kpis').innerHTML =
       kpiTile('Net P/L', fmtMoney(st.netPl), fmtPct(st.netPlPct)+' dari modal', st.netPl>=0?'good':'bad') +
       kpiTile('Win Rate', st.winRate.toFixed(1)+'%', st.totalTrades+' transaksi', '') +
@@ -731,14 +843,14 @@
     return idxs;
   }
 
-  function renderChart(bars, equity){
+  function renderChart(bars, equity, baseline){
     var W=960,H=320,padR=16,padT=16,padB=28;
     var n=bars.length, i;
     var peak=[], p=-Infinity;
     for(i=0;i<equity.length;i++){ p=Math.max(p,equity[i]); peak.push(p); }
     var disp = pickDisplayIndices(equity, MAX_CHART_POINTS);
     // Loop, bukan Math.min.apply: array ratusan ribu elemen membanjiri call stack.
-    var minV=0, maxV=0;
+    var minV=baseline, maxV=baseline;
     for(i=0;i<equity.length;i++){
       if(equity[i]<minV) minV=equity[i];
       if(equity[i]>maxV) maxV=equity[i];
@@ -762,8 +874,8 @@
       gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--grid)" stroke-width="1"/>' +
         '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">'+fmtMoney(val)+'</text>';
     }
-    var zeroY = yAt(0);
-    var baseline = '<line x1="'+padL+'" y1="'+zeroY+'" x2="'+(W-padR)+'" y2="'+zeroY+'" stroke="var(--baseline)" stroke-width="1.5"/>';
+    var baseY = yAt(baseline);
+    var baseLine = '<line x1="'+padL+'" y1="'+baseY+'" x2="'+(W-padR)+'" y2="'+baseY+'" stroke="var(--baseline)" stroke-width="1.5" stroke-dasharray="4 3"/>';
 
     var linePts=[], peakPts=[];
     for(i=0;i<disp.length;i++){
@@ -782,7 +894,7 @@
     }
 
     $('eqchart').innerHTML =
-      gridLines + baseline +
+      gridLines + baseLine +
       '<path d="'+ddPath+'" fill="var(--dd-fill)" stroke="none"/>' +
       '<path d="'+linePath+'" fill="none" stroke="var(--accent-line)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
       xLabels +
@@ -914,7 +1026,7 @@
     if(ds.bars.length < minBars){ toast('Data terlalu sedikit untuk parameter ini (butuh minimal '+minBars+' bar).'); return; }
     var result = runBacktest(ds.bars, buildDesired(ds.bars, state.strategy, params), params);
     renderKpis(result.stats);
-    renderChart(ds.bars, result.equity);
+    renderChart(ds.bars, result.equity, params.balance);
     renderTradeLog(result.trades);
     $('chartTitle').textContent = 'Kurva Ekuitas — ' + ds.name;
     saveRun(ds, result.stats);
