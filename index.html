@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>XAUUSD Backtest Lab — RAFA</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%AA%99</text></svg>">
+<script src="lightweight-charts.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -237,6 +238,11 @@
   .kpi .sv{ font-size:11px; color:var(--text-muted); margin-top:2px; }
 
   .chart-wrap{ position:relative; }
+  .pricechart{ width:100%; height:420px; }
+  .legend .mk{ width:10px; height:10px; border-radius:2px; }
+  .legend .mk.up{ background:var(--good); }
+  .legend .mk.down{ background:var(--bad); }
+  .legend .mk.out{ background:var(--text-muted); border-radius:50%; }
   svg.eqchart{ width:100%; height:auto; display:block; }
   .legend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
   .legend .item{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-secondary); }
@@ -478,6 +484,23 @@
 
       <div class="panel">
         <div class="section-title">
+          <h2 style="font-size:14px;">Carta Harga &amp; Transaksi</h2>
+          <span class="label" id="priceInfo"></span>
+        </div>
+        <div id="priceChart" class="pricechart"></div>
+        <div class="legend">
+          <div class="item"><span class="mk up"></span> Buka Long</div>
+          <div class="item"><span class="mk down"></span> Buka Short</div>
+          <div class="item"><span class="mk out"></span> Tutup</div>
+          <div class="item" style="margin-left:auto;">
+            <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener"
+               style="color:var(--text-muted);text-decoration:none;">Carta oleh TradingView Lightweight Charts&trade;</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">
           <h2 id="chartTitle" style="font-size:14px;">Kurva Ekuitas</h2>
           <span class="label" id="chartRange"></span>
         </div>
@@ -527,7 +550,8 @@
   var MAX_TRADE_ROWS = 500;
   var RUNS_KEY = 'rafa_backtest_runs_v1';
   var IDB_NAME = 'rafa_backtest', IDB_STORE = 'datasets', IDB_VER = 1;
-  var state = { datasets: [], activeDataset: null, runs: [], strategy: 'ma', storeMode: 'none' };
+  var state = { datasets: [], activeDataset: null, runs: [], strategy: 'ma', storeMode: 'none',
+               lastResult: null, lastDs: null, lastBalance: 0 };
 
   function $(id){ return document.getElementById(id); }
   function fmtMoney(v){
@@ -1168,8 +1192,112 @@
     showResult(result, ds, params.balance, strategyLabel(state.strategy));
   }
 
+  // ---------- carta harga (TradingView Lightweight Charts) ----------
+  // Lilin dihadkan kepada MAX_CANDLES bar terakhir: melukis ratusan ribu lilin
+  // memakan memori tanpa memberi apa-apa yang mata boleh nampak.
+  var MAX_CANDLES = 20000, MAX_MARKERS = 300;
+  var priceChart = null, candleSeries = null;
+
+  function chartTheme(){
+    var css = getComputedStyle(document.documentElement);
+    function v(name, fallback){ return (css.getPropertyValue(name) || fallback).trim(); }
+    return {
+      bg: v('--surface', '#ffffff'), text: v('--text-secondary', '#565b66'),
+      grid: v('--grid', '#e3e5ea'), border: v('--border-strong', 'rgba(18,20,26,0.16)'),
+      up: v('--good', '#006300'), down: v('--bad', '#b42318'), muted: v('--text-muted', '#8a8fa0')
+    };
+  }
+
+  function renderPriceChart(bars, trades){
+    var el = $('priceChart');
+    if(typeof LightweightCharts === 'undefined'){
+      el.innerHTML = '<p class="hint" style="padding:16px;">Pustaka carta tidak dimuat — pastikan fail '
+        + '<code>lightweight-charts.js</code> berada di sebelah halaman ini.</p>';
+      return;
+    }
+    var th = chartTheme();
+    if(priceChart){ priceChart.remove(); priceChart = null; }
+    el.innerHTML = '';
+
+    priceChart = LightweightCharts.createChart(el, {
+      autoSize: true,
+      layout: { background: {color: th.bg}, textColor: th.text, attributionLogo: false },
+      grid: { vertLines: {color: th.grid}, horzLines: {color: th.grid} },
+      rightPriceScale: { borderColor: th.border },
+      timeScale: { borderColor: th.border, timeVisible: true, secondsVisible: false },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+    });
+
+    candleSeries = priceChart.addSeries(LightweightCharts.CandlestickSeries, {
+      upColor: th.up, downColor: th.down, wickUpColor: th.up, wickDownColor: th.down,
+      borderUpColor: th.up, borderDownColor: th.down
+    });
+
+    // Tetingkap lilin mesti meliputi tempat transaksi berlaku. Mengambil
+    // MAX_CANDLES terakhir begitu sahaja boleh memaparkan bahagian carta yang
+    // langsung tiada dagangan — contohnya bila akaun mati pada minggu pertama.
+    var start = Math.max(0, bars.length - MAX_CANDLES), end = bars.length;
+    if(bars.length > MAX_CANDLES && trades.length){
+      var minT = Infinity, maxT = -Infinity;
+      trades.forEach(function(x){
+        if(x.entryTime < minT) minT = x.entryTime;
+        if(x.exitTime > maxT) maxT = x.exitTime;
+      });
+      function indexAt(ms){
+        var lo = 0, hi = bars.length - 1;
+        while(lo < hi){ var mid = (lo+hi)>>1; if(bars[mid][0] < ms) lo = mid+1; else hi = mid; }
+        return lo;
+      }
+      var i0 = indexAt(minT), i1 = indexAt(maxT);
+      var span = i1 - i0 + 1;
+      if(span >= MAX_CANDLES){ start = i0; end = i0 + MAX_CANDLES; }
+      else {
+        var pad = Math.floor((MAX_CANDLES - span)/2);
+        start = Math.max(0, i0 - pad);
+        end = Math.min(bars.length, start + MAX_CANDLES);
+        start = Math.max(0, end - MAX_CANDLES);
+      }
+    }
+    var slice = bars.slice(start, end);
+    var data = [], lastT = -1;
+    for(var i=0;i<slice.length;i++){
+      var sec = Math.floor(slice[i][0]/1000);
+      if(sec <= lastT) continue;      // pustaka menuntut masa menaik dan unik
+      lastT = sec;
+      data.push({time:sec, open:slice[i][1], high:slice[i][2], low:slice[i][3], close:slice[i][4]});
+    }
+    candleSeries.setData(data);
+
+    var firstSec = data.length ? data[0].time : 0;
+    var visible = trades.filter(function(x){ return Math.floor(x.entryTime/1000) >= firstSec; });
+    // Label hanya bila carta lapang. Pada 281 transaksi atas 170 lilin, teks
+    // harga bertindih menjadi tembok dan carta terus tidak boleh dibaca.
+    var withText = visible.length <= 40;
+    var marks = [], counted = 0;
+    for(var j=0; j<visible.length && counted < MAX_MARKERS; j++){
+      var tr = visible[j];
+      counted++;
+      marks.push({ time: Math.floor(tr.entryTime/1000), position: tr.dir === 1 ? 'belowBar' : 'aboveBar',
+        color: tr.dir === 1 ? th.up : th.down, shape: tr.dir === 1 ? 'arrowUp' : 'arrowDown',
+        text: withText ? (tr.dir === 1 ? 'B ' : 'S ') + tr.entryPrice.toFixed(2) : '' });
+      marks.push({ time: Math.floor(tr.exitTime/1000), position: 'inBar',
+        color: tr.pl >= 0 ? th.up : th.down, shape: 'circle',
+        text: withText ? fmtMoney(tr.pl) : '' });
+    }
+    marks.sort(function(a,b){ return a.time - b.time; });
+    if(marks.length) LightweightCharts.createSeriesMarkers(candleSeries, marks);
+    priceChart.timeScale().fitContent();
+
+    $('priceInfo').textContent = data.length.toLocaleString('id-ID') + ' lilin'
+      + (bars.length > slice.length ? ' (tetingkap sekitar transaksi)' : '')
+      + ' · ' + counted.toLocaleString('id-ID') + ' transaksi ditanda'
+      + (trades.length > counted ? ' daripada ' + trades.length.toLocaleString('id-ID') : '');
+  }
+
   function showResult(result, ds, balance, label){
+    state.lastResult = result; state.lastDs = ds; state.lastBalance = balance;
     renderKpis(result.stats);
+    renderPriceChart(ds.bars, result.trades);
     renderChart(ds.bars, result.equity, balance);
     renderTradeLog(result.trades);
     $('chartTitle').textContent = 'Kurva Ekuitas — ' + ds.name;
@@ -1804,6 +1932,10 @@
     var next = now ? (now==='dark' ? 'light' : 'dark') : (prefersDark ? 'light' : 'dark');
     root.setAttribute('data-theme', next);
     try{ localStorage.setItem('rafa_theme', next); }catch(e){}
+    // Pustaka carta membaca warna sekali sahaja semasa dicipta.
+    if(state.lastResult && state.lastDs){
+      renderPriceChart(state.lastDs.bars, state.lastResult.trades);
+    }
   });
 
   // ---------- init ----------
