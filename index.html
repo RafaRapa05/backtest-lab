@@ -88,7 +88,7 @@
   .mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   .label{ font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }
 
-  .app{ max-width:1280px; margin:0 auto; padding:20px 20px 48px; }
+  .app{ width:100%; padding:20px 24px 48px; }
 
   header.top{
     display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
@@ -109,7 +109,7 @@
   .dot.on{ background:var(--good); }
   .dot.off{ background:var(--text-muted); }
 
-  .layout{ display:grid; grid-template-columns: 320px 1fr; gap:20px; align-items:start; }
+  .layout{ display:grid; grid-template-columns: minmax(320px, 400px) 1fr; gap:20px; align-items:start; }
   @media (max-width: 880px){ .layout{ grid-template-columns: 1fr; } }
 
   .panel{
@@ -449,7 +449,7 @@
           <span class="label" id="chartRange"></span>
         </div>
         <div class="chart-wrap" id="chartWrap">
-          <svg class="eqchart" id="eqchart" viewBox="0 0 960 320" role="img" aria-label="Kurva ekuitas hasil backtest"></svg>
+          <svg class="eqchart" id="eqchart" viewBox="0 0 1440 380" role="img" aria-label="Kurva ekuitas hasil backtest"></svg>
           <div class="tooltip" id="tooltip"><div class="t1"></div><div class="t2"></div></div>
         </div>
         <div class="legend">
@@ -933,7 +933,7 @@
   }
 
   function renderChart(bars, equity, baseline){
-    var W=960,H=320,padR=16,padT=16,padB=28;
+    var W=1440,H=380,padR=20,padT=18,padB=30;
     var n=bars.length, i;
     var peak=[], p=-Infinity;
     for(i=0;i<equity.length;i++){ p=Math.max(p,equity[i]); peak.push(p); }
