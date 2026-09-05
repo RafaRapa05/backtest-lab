@@ -267,6 +267,9 @@
     margin:0 0 12px; padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.5;
     background:var(--dd-fill); border:1px solid var(--bad); color:var(--bad); font-weight:500;
   }
+  .warnbar.caution{
+    background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent-line);
+  }
   .section-title{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:10px; }
 </style>
 </head>
@@ -394,24 +397,53 @@
         <div class="panel">
           <h2>Model Grid</h2>
           <p class="sub">Mekanik yang benar-benar dijalankan terhadap data harga</p>
-          <div class="row2">
-            <div class="field"><label for="gPoint">Saiz 1 point</label><input type="number" id="gPoint" value="0.01" step="0.001" min="0.00001"></div>
-            <div class="field"><label for="gAnchor">Anchor (points)</label><input type="number" id="gAnchor" value="1000" min="1"></div>
-          </div>
-          <div class="row2">
-            <div class="field"><label for="gStep">Langkah antara level (points)</label><input type="number" id="gStep" value="10" min="1"></div>
-            <div class="field"><label for="gSL">Hard SL (points)</label><input type="number" id="gSL" value="100" min="0"></div>
-          </div>
-          <div class="row2">
-            <div class="field"><label for="gActivate">Basket aktif pada (points)</label><input type="number" id="gActivate" value="3000" min="0"></div>
-            <div class="field"><label for="gTrail">Trail di belakang (points)</label><input type="number" id="gTrail" value="2000" min="0"></div>
-          </div>
           <div class="field">
-            <label for="gLots">Ladder lot (level 1 &rarr; 15)</label>
-            <input type="text" id="gLots" value="0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75">
+            <label for="eaModel">Jenis mekanik</label>
+            <select id="eaModel">
+              <option value="momentum" selected>Breakout + Momentum Layers</option>
+              <option value="grid">Grid Straddle (dua arah)</option>
+            </select>
           </div>
+          <div class="field"><label for="gPoint">Saiz 1 point</label><input type="number" id="gPoint" value="0.01" step="0.001" min="0.00001"></div>
+
+          <div id="model-momentum">
+            <div class="row2">
+              <div class="field"><label for="mInitial">Jarak straddle (points)</label><input type="number" id="mInitial" value="100" min="1"></div>
+              <div class="field"><label for="mSL">SL setiap entry (points)</label><input type="number" id="mSL" value="50" min="1"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="mTrailStart">Trail mula pada (points)</label><input type="number" id="mTrailStart" value="100" min="0"></div>
+              <div class="field"><label for="mTrailDist">Trail di belakang (points)</label><input type="number" id="mTrailDist" value="100" min="1"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="mBaseLot">Lot asas</label><input type="number" id="mBaseLot" value="0.01" step="0.01" min="0.01"></div>
+              <div class="field"><label for="mMultiplier">Pengganda lot</label><input type="number" id="mMultiplier" value="2.0" step="0.1" min="1"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="mLayers">Layer tambahan</label><input type="number" id="mLayers" value="3" min="0" max="20"></div>
+              <div class="field"><label for="mStep">Jarak antara layer (points)</label><input type="number" id="mStep" value="100" min="1"></div>
+            </div>
+            <p class="hint" id="mPreview"></p>
+          </div>
+
+          <div id="model-grid" hidden>
+            <div class="row2">
+              <div class="field"><label for="gAnchor">Anchor (points)</label><input type="number" id="gAnchor" value="1000" min="1"></div>
+              <div class="field"><label for="gStep">Langkah antara level (points)</label><input type="number" id="gStep" value="10" min="1"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="gSL">Hard SL (points)</label><input type="number" id="gSL" value="100" min="0"></div>
+              <div class="field"><label for="gActivate">Basket aktif pada (points)</label><input type="number" id="gActivate" value="3000" min="0"></div>
+            </div>
+            <div class="field"><label for="gTrail">Trail di belakang (points)</label><input type="number" id="gTrail" value="2000" min="0"></div>
+            <div class="field">
+              <label for="gLots">Ladder lot (level 1 &rarr; 15)</label>
+              <input type="text" id="gLots" value="0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75">
+            </div>
+          </div>
+
           <button class="primary" id="runEaBtn" type="button">Jalankan Backtest</button>
-          <p class="note"><strong>Kod MQL5 tidak dijalankan.</strong> Yang dijalankan ialah model grid straddle di atas: Buy Stop dan Sell Stop diletak pada anchor &plusmn; jarak dari harga semasa; setiap kali satu level kena, lot seterusnya dalam ladder dibuka dan level baru diletak sejauh <em>langkah</em>; setiap posisi ada hard SL sendiri. Trailing basket ikut harga &mdash; ia bersedia apabila posisi level #1 untung sebanyak jarak <em>basket aktif</em>, kemudian seluruh basket ditutup bila harga berundur sejauh jarak <em>trail</em> dari puncaknya. Nilai di atas diisi automatik daripada input EA bila namanya sepadan &mdash; semak dan betulkan sebelum jalan.</p>
+          <p class="note" id="modelNote"></p>
         </div>
       </div>
 
@@ -439,6 +471,7 @@
     </aside>
 
     <section>
+      <p class="warnbar" id="resWarning" hidden></p>
       <p class="warnbar" id="blownWarning" hidden></p>
       <div class="kpis" id="kpis"></div>
       <div class="costline" id="costline"></div>
@@ -890,6 +923,21 @@
       warn.hidden = true;
     }
 
+    var res = $('resWarning');
+    // Stop yang jauh lebih kecil daripada julat satu bar tidak boleh dipercayai
+    // pada data bar — riak dalam bar yang akan mencetuskannya tidak kelihatan.
+    if(st.medianRange > 0 && st.tightestStop > 0 && st.tightestStop < st.medianRange*0.5){
+      res.hidden = false;
+      res.className = 'warnbar caution';
+      res.innerHTML = '<strong>Keputusan ini tidak boleh dipercayai.</strong> Stop terketat kau ialah '
+        + st.tightestStop.toFixed(2) + ' manakala julat tengah satu bar ialah ' + st.medianRange.toFixed(2)
+        + '. Pada data bar, simulasi hanya nampak 4 harga setiap bar, jadi ia terlepas riak dalam bar yang'
+        + ' akan mencetuskan SL/trailing jauh lebih awal dalam pasaran sebenar — untung nampak jauh lebih'
+        + ' besar daripada yang mungkin. Guna data M1 (atau lebih halus) untuk EA dengan stop sekecil ini.';
+    } else {
+      res.hidden = true;
+    }
+
     var bits = [
       'Baki akhir <b>' + fmtMoney(st.finalBalance) + '</b>',
       'Spread <b>' + fmtMoney(st.totalSpread) + '</b>',
@@ -897,6 +945,8 @@
       'Swap <b>' + fmtMoney(st.totalSwap) + '</b>'
     ];
     if(st.baskets) bits.push('Basket ditutup <b>' + st.baskets + '×</b>');
+    if(st.cycles) bits.push('Kitaran straddle <b>' + st.cycles + '×</b>');
+    if(st.layersOpened) bits.push('Layer momentum <b>' + st.layersOpened + '</b>');
     if(st.stopOuts) bits.push('Stop out <b>' + st.stopOuts + '×</b>');
     if(st.skippedMargin) bits.push('Ditolak margin <b>' + st.skippedMargin + '×</b>');
     $('costline').innerHTML = bits.map(function(b){ return '<span>'+b+'</span>'; }).join('');
@@ -1028,7 +1078,7 @@
       $('tradeBody').innerHTML = '<tr class="empty-row"><td colspan="9">Belum ada transaksi pada rentang ini. Coba longgarkan parameter strategi.</td></tr>';
       return;
     }
-    var reasonLabel = {sl:'SL', tp:'TP', signal:'Sinyal', end:'Akhir Data', stopout:'Stop Out', basket:'Basket TP'};
+    var reasonLabel = {sl:'SL', tp:'TP', signal:'Sinyal', end:'Akhir Data', stopout:'Stop Out', basket:'Basket TP', trail:'Trailing'};
     var shown = trades.slice(0, MAX_TRADE_ROWS);
     var overflow = trades.length - shown.length;
     $('tradeBody').innerHTML = shown.map(function(t,i){
@@ -1214,13 +1264,32 @@
       + rows + '</tbody></table>';
   }
 
-  function autoMapGrid(items){
+  // Kenal pasti jenis EA daripada nama inputnya, kemudian isi medan model yang
+  // sepadan. Nama MQL5 biasanya cukup jelas untuk dipadankan dengan yakin.
+  function autoMapEa(items){
+    var inputs = items.filter(function(x){ return x.kind === 'input'; });
+    var blob = inputs.map(function(x){ return x.name + ' ' + x.comment; }).join(' ').toLowerCase();
+    var isMomentum = /momentum|lotmultiplier|lot multiplier|additionallayers|additional layers|trailstart/.test(blob);
+    $('eaModel').value = isMomentum ? 'momentum' : 'grid';
+
     var mapped = [], lots = [];
-    items.forEach(function(it){
-      if(it.kind !== 'input') return;
+    inputs.forEach(function(it){
       var num = parseFloat(it.value);
       if(isNaN(num)) return;
       var s = (it.name + ' ' + it.comment).toLowerCase();
+
+      if(isMomentum){
+        if(/baselot|base lot/.test(s)){ $('mBaseLot').value = num; mapped.push('Lot asas'); }
+        else if(/initialdistance|initial distance/.test(s)){ $('mInitial').value = Math.abs(num); mapped.push('Jarak straddle'); }
+        else if(/trailstart|trail start/.test(s)){ $('mTrailStart').value = Math.abs(num); mapped.push('Trail mula'); }
+        else if(/traildistance|trail distance/.test(s)){ $('mTrailDist').value = Math.abs(num); mapped.push('Trail jarak'); }
+        else if(/stoploss|stop loss/.test(s)){ $('mSL').value = Math.abs(num); mapped.push('SL'); }
+        else if(/additionallayers|additional layers/.test(s)){ $('mLayers').value = Math.abs(num); mapped.push('Layer'); }
+        else if(/momentumstep|momentum step/.test(s)){ $('mStep').value = Math.abs(num); mapped.push('Jarak layer'); }
+        else if(/lotmultiplier|lot multiplier/.test(s)){ $('mMultiplier').value = num; mapped.push('Pengganda'); }
+        return;
+      }
+
       var lotM = it.name.match(/lot_?(\d+)/i);
       if(lotM){ lots[parseInt(lotM[1],10)] = num; return; }
       if(/anchor/.test(s)){ $('gAnchor').value = Math.abs(num); mapped.push('Anchor'); }
@@ -1228,10 +1297,12 @@
       else if(/hard sl|stop\s*loss|\bsl\b/.test(s)){ $('gSL').value = Math.abs(num); mapped.push('Hard SL'); }
       else if(/trail/.test(s)){ $('gTrail').value = Math.abs(num); mapped.push('Trail'); }
       else if(/profit/.test(s)){ $('gActivate').value = Math.abs(num); mapped.push('Basket aktif'); }
-      else if(/point/.test(s) && num > 0 && num < 1){ $('gPoint').value = num; mapped.push('Saiz point'); }
     });
-    var ladder = lots.filter(function(v){ return typeof v === 'number'; });
-    if(ladder.length){ $('gLots').value = ladder.join(', '); mapped.push(ladder.length + ' lot'); }
+    if(!isMomentum){
+      var ladder = lots.filter(function(v){ return typeof v === 'number'; });
+      if(ladder.length){ $('gLots').value = ladder.join(', '); mapped.push(ladder.length + ' lot'); }
+    }
+    updateModelUi();
     return mapped;
   }
 
@@ -1411,6 +1482,239 @@
     }};
   }
 
+  // ---------- enjin breakout + momentum layers ----------
+  // Ikut MONDOU ULTRA V1.5: Buy Stop dan Sell Stop simetri sekeliling titik
+  // tengah; sebaik satu kena, pending bertentangan dipadam dan hanya arah itu
+  // didagangkan. Layer tambahan dibuka setiap kali harga bergerak satu langkah
+  // LAGI dalam arah untung (diukur dari entry PERTAMA), dengan lot didarab.
+  // Tiada basket TP — setiap posisi keluar melalui SL sendiri atau trailingnya
+  // sendiri. Bila semua posisi habis, straddle baharu dipasang di harga semasa.
+  function roundLot(v){ return Math.max(0.01, Math.round(v*100)/100); }
+
+  function runMomentumBacktest(bars, m, tr){
+    var n = bars.length, pt = m.point;
+    var initD = m.initialPoints*pt, slD = m.slPoints*pt;
+    var startD = m.trailStartPoints*pt, trailD = m.trailDistPoints*pt;
+    var stepD = m.stepPoints*pt;
+    var maxLayers = 1 + Math.max(0, m.additionalLayers);
+    var balance = tr.balance, equity = new Array(n).fill(tr.balance), trades = [];
+    var peak = tr.balance, maxDD = 0, maxDDPct = 0;
+    var totalCommission = 0, totalSwap = 0, totalSpread = 0;
+    var blownAt = null, exhaustedAt = null, cycles = 0, skippedMargin = 0, layersOpened = 0;
+    var positions = [], armed = false, buyStop = 0, sellStop = 0, buySL = 0, sellSL = 0;
+    var firstEntry = 0, layersUsed = 0, dir = 0;
+
+    // Julat bar dipakai untuk menilai sama ada data cukup halus untuk SL/trail
+    // sekecil ini. Kalau tidak, simulasi tidak nampak riak dalam bar yang akan
+    // mencetuskan stop lebih awal dalam pasaran sebenar.
+    var ranges = [];
+    for(var r=0; r<n; r+=Math.max(1, Math.floor(n/500))) ranges.push(bars[r][2]-bars[r][3]);
+    ranges.sort(function(a,b){ return a-b; });
+    var medianRange = ranges.length ? ranges[Math.floor(ranges.length/2)] : 0;
+
+    function marginNeeded(lots, price){
+      return tr.leverage > 0 ? (lots*tr.contractSize*price)/tr.leverage : 0;
+    }
+    function usedMargin(){
+      return positions.reduce(function(s,p){ return s + marginNeeded(p.lots, p.entry); }, 0);
+    }
+    function floatingAt(bid){
+      return positions.reduce(function(s,p){
+        var exit = p.dir === 1 ? bid : bid + tr.spread;
+        return s + (exit - p.entry)*p.dir*p.lots*tr.contractSize - p.comm - p.swap;
+      }, 0);
+    }
+    function closePos(idx, price, time, reason){
+      var p = positions[idx];
+      var pl = (price - p.entry)*p.dir*p.lots*tr.contractSize - p.comm - p.swap;
+      balance += pl;
+      totalCommission += p.comm; totalSwap += p.swap;
+      totalSpread += tr.spread*p.lots*tr.contractSize;
+      trades.push({dir:p.dir, entryTime:p.time, entryPrice:p.entry, exitTime:time,
+                   exitPrice:price, pl:pl, reason:reason});
+      positions.splice(idx, 1);
+    }
+    function openPos(d, entry, sl, lots, time){
+      if(tr.leverage > 0 && usedMargin() + marginNeeded(lots, entry) > balance + floatingAt(entry)){
+        skippedMargin++; return false;
+      }
+      positions.push({dir:d, lots:lots, entry:entry, sl:sl, time:time,
+                      comm: tr.commission*lots*2, swap:0, trailed:false});
+      return true;
+    }
+    function armStraddle(bid){
+      var anchor = bid + tr.spread/2;
+      buyStop = anchor + initD; buySL = buyStop - slD;
+      sellStop = anchor - initD; sellSL = sellStop + slD;
+      armed = true; dir = 0; firstEntry = 0; layersUsed = 0; cycles++;
+    }
+
+    for(var i=0;i<n;i++){
+      var t=bars[i][0], o=bars[i][1], h=bars[i][2], l=bars[i][3], c=bars[i][4];
+      if(!armed && !positions.length) armStraddle(o);
+
+      if(positions.length && i > 0){
+        var prev = new Date(bars[i-1][0]), now = new Date(t);
+        if(prev.getUTCDate() !== now.getUTCDate() || prev.getUTCMonth() !== now.getUTCMonth()
+           || prev.getUTCFullYear() !== now.getUTCFullYear()){
+          var nights = now.getUTCDay() === 4 ? 3 : 1;
+          positions.forEach(function(p){
+            p.swap -= (p.dir === 1 ? tr.swapLong : tr.swapShort)*p.lots*nights;
+          });
+        }
+      }
+
+      var order = (c >= o) ? ['low','high'] : ['high','low'];
+      for(var s=0; s<2; s++){
+        var isLow = order[s] === 'low';
+        var bid = isLow ? l : h;
+        var ask = bid + tr.spread;
+
+        for(var pi=positions.length-1; pi>=0; pi--){
+          var p = positions[pi];
+          if(p.dir === 1 && isLow && bid <= p.sl) closePos(pi, p.sl, t, p.trailed ? 'trail' : 'sl');
+          else if(p.dir === -1 && !isLow && ask >= p.sl) closePos(pi, p.sl, t, p.trailed ? 'trail' : 'sl');
+        }
+
+        if(armed && !positions.length){
+          if(!isLow && ask >= buyStop){
+            if(openPos(1, buyStop, buySL, roundLot(m.baseLot), t)){
+              dir = 1; firstEntry = buyStop; layersUsed = 1; armed = false;
+            }
+          } else if(isLow && bid <= sellStop){
+            if(openPos(-1, sellStop, sellSL, roundLot(m.baseLot), t)){
+              dir = -1; firstEntry = sellStop; layersUsed = 1; armed = false;
+            }
+          }
+        }
+
+        if(m.enableLayers && dir !== 0 && layersUsed >= 1 && layersUsed < maxLayers && firstEntry > 0){
+          var trig = dir === 1 ? firstEntry + stepD*layersUsed : firstEntry - stepD*layersUsed;
+          if(dir === 1 ? (bid >= trig) : (ask <= trig)){
+            var lots = roundLot(m.baseLot*Math.pow(m.multiplier, layersUsed));
+            var entry = dir === 1 ? trig + tr.spread : trig - tr.spread;
+            var sl = dir === 1 ? entry - slD : entry + slD;
+            // Ikut EA: kiraan layer hanya bertambah bila order benar-benar masuk.
+            if(openPos(dir, entry, sl, lots, t)){ layersUsed++; layersOpened++; }
+          }
+        }
+
+        for(var pj=0; pj<positions.length; pj++){
+          var q = positions[pj];
+          if(q.dir === 1){
+            if((bid - q.entry) >= startD){
+              var cand = bid - trailD;
+              if(cand > q.sl){ q.sl = cand; q.trailed = true; }
+            }
+          } else {
+            if((q.entry - ask) >= startD){
+              var cand2 = ask + trailD;
+              if(cand2 < q.sl){ q.sl = cand2; q.trailed = true; }
+            }
+          }
+        }
+
+        if(!armed && !positions.length && dir !== 0) armStraddle(bid);
+      }
+
+      var eq = balance + floatingAt(c);
+      equity[i] = eq;
+      if(eq > peak) peak = eq;
+      var dd = peak - eq; if(dd > maxDD) maxDD = dd;
+      var ddPct = peak > 0 ? dd/peak*100 : 0; if(ddPct > maxDDPct) maxDDPct = ddPct;
+
+      if(balance <= 0){
+        while(positions.length) closePos(0, positions[0].dir === 1 ? c : c + tr.spread, t, 'stopout');
+        blownAt = t; equity[i] = balance;
+        for(var k=i+1;k<n;k++) equity[k] = balance;
+        break;
+      }
+      if(!positions.length && tr.leverage > 0 && balance < marginNeeded(roundLot(m.baseLot), c)){
+        exhaustedAt = t;
+        for(var k2=i+1;k2<n;k2++) equity[k2] = balance;
+        break;
+      }
+    }
+    if(positions.length && !blownAt && !exhaustedAt){
+      var last = bars[n-1];
+      while(positions.length) closePos(0, positions[0].dir === 1 ? last[4] : last[4] + tr.spread, last[0], 'end');
+      equity[n-1] = balance;
+    }
+
+    var wins = trades.filter(function(x){return x.pl>0;}), losses = trades.filter(function(x){return x.pl<=0;});
+    var grossProfit = wins.reduce(function(s,x){return s+x.pl;},0);
+    var grossLoss = Math.abs(losses.reduce(function(s,x){return s+x.pl;},0));
+    var netPl = balance - tr.balance;
+    return { equity:equity, trades:trades, stats:{
+      netPl: netPl, netPlPct: tr.balance>0 ? netPl/tr.balance*100 : 0,
+      winRate: trades.length ? wins.length/trades.length*100 : 0,
+      profitFactor: grossLoss>0 ? grossProfit/grossLoss : (grossProfit>0?Infinity:0),
+      totalTrades: trades.length, maxDD: maxDD, maxDDPct: maxDDPct,
+      expectancy: trades.length ? netPl/trades.length : 0,
+      totalCommission: totalCommission, totalSwap: totalSwap, totalSpread: totalSpread,
+      stopOuts: 0, skippedMargin: skippedMargin, cycles: cycles, layersOpened: layersOpened,
+      finalBalance: balance, blownAt: blownAt, exhaustedAt: exhaustedAt,
+      medianRange: medianRange, tightestStop: Math.min(slD, trailD)
+    }};
+  }
+
+  function readMomentumSettings(){
+    return {
+      point: parseFloat($('gPoint').value) || 0.01,
+      initialPoints: parseFloat($('mInitial').value) || 0,
+      slPoints: parseFloat($('mSL').value) || 0,
+      trailStartPoints: parseFloat($('mTrailStart').value) || 0,
+      trailDistPoints: parseFloat($('mTrailDist').value) || 0,
+      baseLot: parseFloat($('mBaseLot').value) || 0.01,
+      multiplier: parseFloat($('mMultiplier').value) || 1,
+      additionalLayers: parseInt($('mLayers').value, 10) || 0,
+      stepPoints: parseFloat($('mStep').value) || 0,
+      enableLayers: true
+    };
+  }
+
+  function updateModelUi(){
+    var model = $('eaModel').value;
+    $('model-momentum').hidden = model !== 'momentum';
+    $('model-grid').hidden = model !== 'grid';
+    if(model === 'momentum'){
+      var m = readMomentumSettings();
+      var seq = [], lot = m.baseLot;
+      for(var i=0;i<=m.additionalLayers;i++){ seq.push(roundLot(m.baseLot*Math.pow(m.multiplier,i))); }
+      $('mPreview').innerHTML = 'Jujukan lot: <strong>' + seq.join(' → ') + '</strong>'
+        + ' &middot; jumlah ' + roundLot(seq.reduce(function(a,b){return a+b;},0)) + ' lot'
+        + ' &middot; layer #' + (m.additionalLayers+1) + ' dibuka pada +'
+        + (m.stepPoints*m.additionalLayers) + ' points dari entry pertama.';
+      $('modelNote').innerHTML = '<strong>Kod MQL5 tidak dijalankan.</strong> Yang dijalankan ialah model'
+        + ' <em>breakout + momentum layers</em>: Buy Stop dan Sell Stop dipasang simetri sekeliling harga;'
+        + ' sebaik satu kena, pending sebelah lagi dipadam dan hanya arah itu didagangkan. Setiap kali harga'
+        + ' bergerak satu <em>langkah</em> lagi dalam arah untung (diukur dari entry pertama), satu layer'
+        + ' baharu dibuka dengan lot didarab. Tiada basket TP &mdash; setiap posisi keluar melalui SL'
+        + ' sendiri atau trailingnya sendiri, dan bila semuanya habis satu straddle baharu dipasang.';
+    } else {
+      $('modelNote').innerHTML = '<strong>Kod MQL5 tidak dijalankan.</strong> Yang dijalankan ialah model'
+        + ' grid straddle: Buy Stop dan Sell Stop pada anchor &plusmn; jarak; setiap level yang kena membuka'
+        + ' lot seterusnya dalam ladder dan meletak level baharu sejauh <em>langkah</em>; setiap posisi ada'
+        + ' hard SL sendiri. Seluruh basket ditutup bila harga berundur sejauh jarak <em>trail</em> selepas'
+        + ' posisi level #1 cukup untung.';
+    }
+  }
+
+  function executeEa(){
+    if($('eaModel').value === 'momentum'){
+      var ds = state.activeDataset;
+      if(!ds || !ds.bars || !ds.bars.length){ toast('Pilih atau unggah dataset dulu.'); return; }
+      var m = readMomentumSettings();
+      if(m.initialPoints <= 0 || m.slPoints <= 0 || m.trailDistPoints <= 0){
+        toast('Jarak straddle, SL dan trail mesti lebih besar daripada sifar.'); return;
+      }
+      var tr = readSettings();
+      showResult(runMomentumBacktest(ds.bars, m, tr), ds, tr.balance, 'Momentum');
+    } else {
+      executeGrid();
+    }
+  }
+
   function executeGrid(){
     var ds = state.activeDataset;
     if(!ds || !ds.bars || !ds.bars.length){ toast('Pilih atau unggah dataset dulu.'); return; }
@@ -1437,33 +1741,33 @@
     if(!count){ $('parseInfo').textContent = 'Tiada input dijumpai'; toast('Tiada baris input dijumpai dalam kod itu.'); return; }
     renderEaInputs(items);
     $('eaInputsPanel').hidden = false;
-    var mapped = autoMapGrid(items);
+    var mapped = autoMapEa(items);
     $('parseInfo').textContent = count + ' input dibaca';
     toast(count + ' input dibaca' + (mapped.length ? '. Dipetakan: ' + mapped.join(', ') : '.'));
   });
 
   $('sampleEaBtn').addEventListener('click', function(){
     $('eaCode').value = [
-      'input group "=== GRID DISTANCE (RAW BROKER POINTS) ==="',
-      'input int    InpAnchorPoints  = 1000;   // #1 = anchor +/-1000 points',
-      'input int    InpStepPoints    = 10;     // next level = +10 points',
-      'input int    InpHardSLPoints  = 100;    // hard SL from each entry',
-      '',
-      'input group "=== VIRTUAL BASKET TRAILING ==="',
-      'input int    InpBasketArm     = 3000;   // level #1 must be +3000 points in profit',
-      'input int    InpBasketTrail   = 2000;   // trail follows 2000 points behind price',
-      '',
-      'input group "=== LOTS : LEVEL #1 TO #15 ==="',
-      'input double InpLot01 = 0.05;',
-      'input double InpLot02 = 0.1;',
-      'input double InpLot03 = 0.15;',
-      'input double InpLot04 = 0.2;',
-      'input double InpLot05 = 0.25;'
+      'input ulong  InpMagicNumber           = 26090315;',
+      'input double InpBaseLot               = 0.01;',
+      'input int    InpPointsPerPip          = 10;',
+      'input int    InpInitialDistancePoints = 100; // BUY STOP +100 pt / SELL STOP -100 pt',
+      'input int    InpStopLossPoints        = 50;  // own SL for every entry',
+      'input int    InpTrailStartPoints      = 100; // trailing starts after +100 pt profit',
+      'input int    InpTrailDistancePoints   = 100; // trailing remains 100 pt behind price',
+      'input bool   InpEnableMomentumLayers  = true;',
+      'input int    InpAdditionalLayers      = 3;',
+      'input int    InpMomentumStepPoints    = 100;',
+      'input double InpLotMultiplier         = 2.0;'
     ].join('\n');
     $('parseBtn').click();
   });
 
-  $('runEaBtn').addEventListener('click', executeGrid);
+  $('runEaBtn').addEventListener('click', executeEa);
+  $('eaModel').addEventListener('change', updateModelUi);
+  ['mBaseLot','mMultiplier','mLayers','mStep'].forEach(function(id){
+    $(id).addEventListener('input', updateModelUi);
+  });
 
   $('strategyTabs').addEventListener('click', function(e){
     var btn = e.target.closest('button[data-s]'); if(!btn) return;
@@ -1509,6 +1813,7 @@
   }catch(e){}
 
   state.runs = loadRuns();
+  updateModelUi();
   selectSample();
   renderRunHistory();
   execute();
